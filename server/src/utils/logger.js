@@ -6,6 +6,13 @@ const isDevelopment = process.env.NODE_ENV === "development";
 
 const logger = pino({
   level: logLevel,
+  redact: {
+    paths: [
+      "req.headers.authorization",
+      "req.headers.cookie",
+    ],
+    censor: "[REDACTED]",
+  },
   transport: isDevelopment
     ? {
         target: "pino-pretty",
