@@ -23,10 +23,26 @@ before(async function () {
 after(async function () {
     this.timeout(120000);
 
-    await mongoose.disconnect();
+    let disconnectError;
 
-    if (mongoServer) {
-        await mongoServer.stop();
+    try {
+        await mongoose.disconnect();
+    } catch (error) {
+        disconnectError = error;
+    }
+
+    try {
+        if (mongoServer) {
+            await mongoServer.stop();
+        }
+    } catch (error) {
+        if (!disconnectError) {
+            throw error;
+        }
+    }
+
+    if (disconnectError) {
+        throw disconnectError;
     }
 });
 
@@ -80,6 +96,36 @@ describe("Authentication API", () => {
                     name: "No",
                     email: "invalid-email",
                     password: "123",
+                });
+
+            expect(response.status).to.equal(400);
+            expect(response.body.success).to.equal(false);
+        });
+
+        it("should accept a password of exactly 72 UTF-8 bytes", async () => {
+            const password = "A".repeat(72);
+
+            const response = await request(app)
+                .post("/api/auth/register")
+                .send({
+                    name: "Muhammad Noor",
+                    email: "noor72@example.com",
+                    password,
+                });
+
+            expect(response.status).to.equal(201);
+            expect(response.body.success).to.equal(true);
+        });
+
+        it("should reject a password exceeding 72 UTF-8 bytes", async () => {
+            const password = "A".repeat(73);
+
+            const response = await request(app)
+                .post("/api/auth/register")
+                .send({
+                    name: "Muhammad Noor",
+                    email: "noor73@example.com",
+                    password,
                 });
 
             expect(response.status).to.equal(400);

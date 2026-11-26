@@ -2,11 +2,14 @@
 import { expect } from "chai";
 import request from "supertest";
 import express from "express";
+import pino from "pino";
+import { Writable } from "stream";
 
 import app from "../src/app.js";
-import errorHandler from "../src/middleware/errorHandler.js";
+import errorHandler, {
+  createErrorHandler,
+} from "../src/middleware/errorHandler.js";
 
-// A small app to test how our API handles errors
 const errorTestApp = express();
 
 errorTestApp.get("/server-error", () => {
@@ -92,6 +95,40 @@ describe("Notes API", () => {
       expect(response.status).to.equal(400);
       expect(response.body.success).to.equal(false);
       expect(response.body.message).to.equal("Invalid request");
+    });
+
+    it("should not log passwords from malformed JSON requests", async () => {
+      let logOutput = "";
+
+      const testLogger = pino(
+        { level: "error" },
+        new Writable({
+          write(chunk, encoding, callback) {
+            logOutput += chunk.toString();
+            callback();
+          },
+        })
+      );
+
+      const malformedJsonApp = express();
+
+      malformedJsonApp.use(express.json());
+
+      malformedJsonApp.post("/api/auth/login", (req, res) => {
+        res.json({ success: true });
+      });
+
+      malformedJsonApp.use(createErrorHandler(testLogger));
+
+      const secretPassword = "MyFakeSecretPassword123";
+
+      const response = await request(malformedJsonApp)
+        .post("/api/auth/login")
+        .set("Content-Type", "application/json")
+        .send(`{"email":"test@example.com","password":"${secretPassword}"`);
+
+      expect(response.status).to.equal(400);
+      expect(logOutput).to.not.include(secretPassword);
     });
   });
 });
