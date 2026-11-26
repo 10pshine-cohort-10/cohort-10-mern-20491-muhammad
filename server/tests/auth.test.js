@@ -132,6 +132,36 @@ describe("Authentication API", () => {
             expect(response.body.success).to.equal(false);
         });
 
+        it("should accept a multibyte password of exactly 72 UTF-8 bytes", async () => {
+            const password = "€".repeat(24);
+
+            const response = await request(app)
+                .post("/api/auth/register")
+                .send({
+                    name: "Muhammad Noor",
+                    email: "noor-euro72@example.com",
+                    password,
+                });
+
+            expect(response.status).to.equal(201);
+            expect(response.body.success).to.equal(true);
+        });
+
+        it("should reject a multibyte password exceeding 72 UTF-8 bytes", async () => {
+            const password = "€".repeat(25);
+
+            const response = await request(app)
+                .post("/api/auth/register")
+                .send({
+                    name: "Muhammad Noor",
+                    email: "noor-euro75@example.com",
+                    password,
+                });
+
+            expect(response.status).to.equal(400);
+            expect(response.body.success).to.equal(false);
+        });
+
         it("should reject additional fields", async () => {
             const response = await request(app)
                 .post("/api/auth/register")
